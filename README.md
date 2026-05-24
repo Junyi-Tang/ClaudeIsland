@@ -2,6 +2,8 @@
 
 A premium Dynamic Island-style desktop notification pill for [Claude Code](https://claude.ai/code). Built with WPF for hardware-accelerated rendering, featuring the official Claude brand icon with correct SVG rendering and Windows 11 native rounded corners.
 
+![ClaudeIsland notification pill](assets/screenshot.png)
+
 ## Features
 
 - **Dynamic Island pill** — 400×90 custom WPF floating window, CornerRadius 16, drop shadow
