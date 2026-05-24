@@ -1,5 +1,5 @@
 # ── Notification daemon — watches trigger file, shows WPF pill instantly ──
-# Start once per session: Start-Process powershell -WindowStyle Hidden -NoProfile -ArgumentList "-ExecutionPolicy Bypass -File `"C:\Users\27650\notify-daemon.ps1`""
+# Start once per session: Start-Process powershell -WindowStyle Hidden -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", """C:\Users\27650\ClaudeIsland\notify-daemon.ps1""")
 
 Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
 
