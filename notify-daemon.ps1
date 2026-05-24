@@ -1,7 +1,13 @@
 # ── Notification daemon — watches trigger file, shows WPF pill instantly ──
-# Start once per session: Start-Process powershell -WindowStyle Hidden -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", """<path-to>\notify-daemon.ps1""")
+# Start once per session: Start-Process powershell -WindowStyle Hidden -NoProfile -ArgumentList "-ExecutionPolicy Bypass -File `"C:\Users\27650\notify-daemon.ps1`""
 
 Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
+
+# Windows 11 native rounded corners via DWM
+$DwmApi = Add-Type -MemberDefinition @"
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+"@ -Name "DwmUtil" -Namespace "Win32" -PassThru
 
 $triggerFile = "$env:TEMP\claude_notify_trigger.txt"
 $scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
@@ -63,7 +69,7 @@ while ($true) {
             $window.ShowInTaskbar = $false
             $window.ShowActivated = $false
             $window.Width = 400
-            $window.Height = 86
+            $window.Height = 90
             $window.Left = $screen.Width - $window.Width - 12
             $window.Top = $screen.Height - $window.Height - 24
             $window.ResizeMode = 'NoResize'
@@ -71,7 +77,7 @@ while ($true) {
 
             # ── Card ──
             $card = New-Object System.Windows.Controls.Border
-            $card.CornerRadius = New-Object System.Windows.CornerRadius(37)
+            $card.CornerRadius = New-Object System.Windows.CornerRadius(16)
             $card.Background = New-Object System.Windows.Media.SolidColorBrush($cardBg)
             $card.BorderThickness = New-Object System.Windows.Thickness(0)
             $card.ClipToBounds = $true
@@ -96,7 +102,7 @@ while ($true) {
             # ── Icon badge ──
             $iconBadge = New-Object System.Windows.Controls.Border
             $iconBadge.Width = 44; $iconBadge.Height = 44
-            $iconBadge.CornerRadius = New-Object System.Windows.CornerRadius(22)
+            $iconBadge.CornerRadius = New-Object System.Windows.CornerRadius(10)
             $iconBadge.Background = $iconBgBrush
             $iconBadge.BorderThickness = New-Object System.Windows.Thickness(0)
             $iconBadge.VerticalAlignment = 'Center'
@@ -228,6 +234,12 @@ while ($true) {
             })
 
             $window.Show()
+            # Windows 11 native rounded corners (DWMWCP_ROUNDSMALL)
+            try {
+                $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
+                $pref = 3
+                [Win32.DwmUtil]::DwmSetWindowAttribute($helper.Handle, 33, [ref]$pref, 4)
+            } catch {}
             [System.Media.SystemSounds]::Asterisk.Play()
             $enterSB.Begin()
             [System.Windows.Threading.Dispatcher]::PushFrame($frame)
