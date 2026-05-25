@@ -1,6 +1,22 @@
 param([string]$Message = "")
 
-# ── Hook entry point: debounce, play sound, write trigger, exit fast ──
+# ── Hook entry point: ensure daemon alive, debounce, play sound, write trigger, exit fast ──
+
+# Auto-start daemon if not running
+$daemonLock = "$env:TEMP\claude_notify_daemon.lock"
+$daemonAlive = $false
+if (Test-Path $daemonLock) {
+    try {
+        $daemonPid = [int](Get-Content $daemonLock -Raw).Trim()
+        $daemonProc = Get-Process -Id $daemonPid -ErrorAction SilentlyContinue
+        if ($daemonProc -and $daemonProc.ProcessName -eq "powershell") { $daemonAlive = $true }
+    } catch {}
+}
+if (-not $daemonAlive) {
+    $daemonPath = Join-Path (Split-Path $MyInvocation.MyCommand.Path -Parent) "notify-daemon.ps1"
+    Start-Process powershell -WindowStyle Hidden -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", $daemonPath)
+}
+
 $lockFile = "$env:TEMP\claude_notify_lock.txt"
 $now = Get-Date
 if (Test-Path $lockFile) {
