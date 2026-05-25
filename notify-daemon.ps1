@@ -49,10 +49,12 @@ if (-not $svgPathDataCached) {
     $svgPathDataCached = "M13 3.5c-4.7 0-8.5 3.8-8.5 8.5s3.8 8.5 8.5 8.5c3.2 0 6-1.8 7.4-4.5M11.5 8.5c-2.2 0-4 1.8-4 4s1.8 4 4 4c1.5 0 2.8-.8 3.5-2"
 }
 
-# Pre-warm theme tokens
-$cardBg  = [System.Windows.Media.Color]::FromRgb(10, 10, 12)
-$white   = [System.Windows.Media.Color]::FromRgb(255, 255, 255)
-$slate   = [System.Windows.Media.Color]::FromRgb(160, 165, 175)
+# Pre-warm theme tokens — warm-tinted neutrals, no pure black or white
+$cardBg  = [System.Windows.Media.Color]::FromRgb(12, 10, 8)
+$warmWht = [System.Windows.Media.Color]::FromRgb(252, 249, 246)
+$slate   = [System.Windows.Media.Color]::FromRgb(160, 152, 140)
+$dim     = [System.Windows.Media.Color]::FromRgb(105, 100, 95)
+$faint   = [System.Windows.Media.Color]::FromRgb(115, 110, 105)
 $accentBrush = New-Object System.Windows.Media.LinearGradientBrush
 $accentBrush.StartPoint = New-Object System.Windows.Point(0, 0)
 $accentBrush.EndPoint = New-Object System.Windows.Point(0, 1)
@@ -61,7 +63,7 @@ $a2 = New-Object System.Windows.Media.GradientStop([System.Windows.Media.Color]:
 $accentBrush.GradientStops.Add($a1) | Out-Null
 $accentBrush.GradientStops.Add($a2) | Out-Null
 $iconBgBrush = New-Object System.Windows.Media.SolidColorBrush(
-    [System.Windows.Media.Color]::FromArgb(30, 255, 255, 255)
+    [System.Windows.Media.Color]::FromArgb(30, 252, 249, 246)
 )
 $propOpacity = New-Object System.Windows.PropertyPath("Opacity")
 $propScaleX  = New-Object System.Windows.PropertyPath("ScaleX")
@@ -111,7 +113,7 @@ while ($true) {
 
                 # ── Inner grid ──
                 $innerGrid = New-Object System.Windows.Controls.Grid
-                $innerGrid.Margin = New-Object System.Windows.Thickness(18, 0, 20, 0)
+                $innerGrid.Margin = New-Object System.Windows.Thickness(18, 0, 18, 0)
                 $iconCol = New-Object System.Windows.Controls.ColumnDefinition
                 $iconCol.Width = [System.Windows.GridLength]::new(60)
                 $textCol = New-Object System.Windows.Controls.ColumnDefinition
@@ -157,7 +159,7 @@ while ($true) {
 
                 $title = New-Object System.Windows.Controls.TextBlock
                 $title.Text = "Claude Code"
-                $title.Foreground = New-Object System.Windows.Media.SolidColorBrush($white)
+                $title.Foreground = New-Object System.Windows.Media.SolidColorBrush($warmWht)
                 $title.FontFamily = "Segoe UI"; $title.FontWeight = 'Bold'; $title.FontSize = 18
 
                 $body = New-Object System.Windows.Controls.TextBlock
@@ -169,9 +171,7 @@ while ($true) {
 
                 $hint = New-Object System.Windows.Controls.TextBlock
                 $hint.Text = ([char]0x2022 + " Click to dismiss")
-                $hint.Foreground = New-Object System.Windows.Media.SolidColorBrush(
-                    [System.Windows.Media.Color]::FromRgb(100, 105, 115)
-                )
+                $hint.Foreground = New-Object System.Windows.Media.SolidColorBrush($dim)
                 $hint.FontFamily = "Segoe UI"; $hint.FontSize = 11
                 $hint.Margin = New-Object System.Windows.Thickness(0, 2, 0, 0)
 
@@ -183,9 +183,7 @@ while ($true) {
                 # ── Timestamp ──
                 $statusBadge = New-Object System.Windows.Controls.TextBlock
                 $statusBadge.Text = $showTime.ToString("HH:mm")
-                $statusBadge.Foreground = New-Object System.Windows.Media.SolidColorBrush(
-                    [System.Windows.Media.Color]::FromRgb(110, 115, 125)
-                )
+                $statusBadge.Foreground = New-Object System.Windows.Media.SolidColorBrush($faint)
                 $statusBadge.FontFamily = "Segoe UI"; $statusBadge.FontSize = 11
                 $statusBadge.VerticalAlignment = 'Top'; $statusBadge.HorizontalAlignment = 'Right'
                 $statusBadge.Margin = New-Object System.Windows.Thickness(8, 2, 0, 0)
@@ -227,7 +225,7 @@ while ($true) {
                 $exitSB = New-Object System.Windows.Media.Animation.Storyboard
                 $ef = New-Object System.Windows.Media.Animation.DoubleAnimation
                 $ef.From = 1.0; $ef.To = 0.0
-                $ef.Duration = [System.TimeSpan]::FromMilliseconds(350)
+                $ef.Duration = [System.TimeSpan]::FromMilliseconds(187)
                 $ef.BeginTime = [System.TimeSpan]::FromSeconds(30)
                 [System.Windows.Media.Animation.Storyboard]::SetTarget($ef, $window)
                 [System.Windows.Media.Animation.Storyboard]::SetTargetProperty($ef, $propOpacity)
@@ -239,6 +237,30 @@ while ($true) {
                     $scaleTransform.ScaleX = 1.0
                     $scaleTransform.ScaleY = 1.0
                     $exitSB.Begin()
+                })
+
+                # ── Hover feedback: subtle lighten on enter, restore on leave ──
+                $card.Add_MouseEnter({
+                    $sb = New-Object System.Windows.Media.Animation.Storyboard
+                    $ca = New-Object System.Windows.Media.Animation.ColorAnimation
+                    $ca.To = [System.Windows.Media.Color]::FromRgb(28, 25, 22)
+                    $ca.Duration = [System.TimeSpan]::FromMilliseconds(180)
+                    [System.Windows.Media.Animation.Storyboard]::SetTarget($ca, $card)
+                    [System.Windows.Media.Animation.Storyboard]::SetTargetProperty($ca,
+                        New-Object System.Windows.PropertyPath("Background.Color"))
+                    $sb.Children.Add($ca) | Out-Null
+                    $sb.Begin()
+                })
+                $card.Add_MouseLeave({
+                    $sb = New-Object System.Windows.Media.Animation.Storyboard
+                    $ca = New-Object System.Windows.Media.Animation.ColorAnimation
+                    $ca.To = $cardBg
+                    $ca.Duration = [System.TimeSpan]::FromMilliseconds(250)
+                    [System.Windows.Media.Animation.Storyboard]::SetTarget($ca, $card)
+                    [System.Windows.Media.Animation.Storyboard]::SetTargetProperty($ca,
+                        New-Object System.Windows.PropertyPath("Background.Color"))
+                    $sb.Children.Add($ca) | Out-Null
+                    $sb.Begin()
                 })
 
                 $card.Add_MouseLeftButtonDown({
@@ -271,5 +293,5 @@ while ($true) {
             }
         }
     }
-    Start-Sleep -Milliseconds 250
+    Start-Sleep -Milliseconds 100
 }

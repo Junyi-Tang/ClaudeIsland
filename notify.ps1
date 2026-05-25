@@ -28,18 +28,20 @@ $now.ToString("o") | Out-File $lockFile -Force
 # Instant audio — plays before WPF even loads
 [System.Media.SystemSounds]::Asterisk.Play()
 
-# Try stdin for hook JSON (dynamic task summary)
+# Try stdin for hook JSON (non-blocking — Peek returns -1 if no data)
 if ([string]::IsNullOrEmpty($Message)) {
     try {
-        $stdinLines = @()
-        while ($null -ne ($line = [Console]::In.ReadLine())) { $stdinLines += $line }
-        $stdin = $stdinLines -join "`n"
-        if ($stdin) {
-            $json = $stdin | ConvertFrom-Json -ErrorAction SilentlyContinue
-            if ($json -and $json.user_prompt) {
-                $prompt = $json.user_prompt
-                if ($prompt.Length -gt 40) { $prompt = $prompt.Substring(0, 37) + "..." }
-                $Message = "Finished: `"$prompt`""
+        if ([Console]::In.Peek() -ne -1) {
+            $stdinLines = @()
+            while ([Console]::In.Peek() -ne -1 -and ($null -ne ($line = [Console]::In.ReadLine()))) { $stdinLines += $line }
+            $stdin = $stdinLines -join "`n"
+            if ($stdin) {
+                $json = $stdin | ConvertFrom-Json -ErrorAction SilentlyContinue
+                if ($json -and $json.user_prompt) {
+                    $prompt = $json.user_prompt
+                    if ($prompt.Length -gt 40) { $prompt = $prompt.Substring(0, 37) + "..." }
+                    $Message = "Finished: `"$prompt`""
+                }
             }
         }
     } catch {}
