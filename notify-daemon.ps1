@@ -1,13 +1,36 @@
 # ── Notification daemon — watches trigger file, shows WPF pill instantly ──
-# Start once per session: Start-Process powershell -WindowStyle Hidden -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", """C:\Users\27650\ClaudeCodeNotifyBeacon\notify-daemon.ps1""")
+# Start once per session: Start-Process powershell -WindowStyle Hidden -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", """C:\Users\27650\ClaudeCodeNotifyBeacon\notify-daemon.ps1""")
 
-Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
+# Ensure STA mode for WPF
+if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
+    Write-Host "ERROR: Must run in STA mode. Use: powershell -STA -File notify-daemon.ps1"
+    exit 1
+}
+
+$ErrorActionPreference = "Continue"
+$logFile = "$env:TEMP\claude_notify_daemon.log"
+"Daemon started at $(Get-Date) in $([Threading.Thread]::CurrentThread.GetApartmentState()) mode" | Out-File $logFile -Force
+
+try {
+    Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
+    "WPF loaded" | Out-File $logFile -Append
+} catch {
+    "ERROR loading WPF: $_" | Out-File $logFile -Append
+    exit 1
+}
 
 # Windows 11 native rounded corners via DWM
-$DwmApi = Add-Type -MemberDefinition @"
-    [DllImport("dwmapi.dll")]
-    public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+try {
+    if (-not ([System.Management.Automation.PSTypeName]'Win32.DwmUtil').Type) {
+        $DwmApi = Add-Type -MemberDefinition @"
+            [DllImport("dwmapi.dll")]
+            public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 "@ -Name "DwmUtil" -Namespace "Win32" -PassThru
+    }
+    "DWM API loaded" | Out-File $logFile -Append
+} catch {
+    "DWM API already loaded or error: $_" | Out-File $logFile -Append
+}
 
 $triggerFile = "$env:TEMP\claude_notify_trigger.txt"
 $scriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
@@ -50,13 +73,17 @@ $propScaleY  = New-Object System.Windows.PropertyPath("ScaleY")
 
 $lastTrigger = $null
 
+"Entering watch loop" | Out-File $logFile -Append
+
 while ($true) {
     if (Test-Path $triggerFile) {
         $current = (Get-Item $triggerFile).LastWriteTime
         if ($current -ne $lastTrigger) {
+            "Trigger detected at $current" | Out-File $logFile -Append
             $lastTrigger = $current
             $Message = (Get-Content $triggerFile -Encoding utf8 -Raw).Trim()
             if (-not $Message) { $Message = "Task completed" }
+            "Message: $Message" | Out-File $logFile -Append
             $showTime = Get-Date
             $screen = [System.Windows.SystemParameters]::WorkArea
 
@@ -233,17 +260,26 @@ while ($true) {
                 $csb.Begin()
             })
 
-            $window.Show()
-            # Windows 11 native rounded corners (DWMWCP_ROUNDSMALL)
             try {
-                $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
-                $pref = 3
-                [Win32.DwmUtil]::DwmSetWindowAttribute($helper.Handle, 33, [ref]$pref, 4)
-            } catch {}
-            [System.Media.SystemSounds]::Asterisk.Play()
-            $enterSB.Begin()
-            [System.Windows.Threading.Dispatcher]::PushFrame($frame)
-            $window.Close()
+                "About to show window" | Out-File $logFile -Append
+                $window.Show()
+                "Window shown" | Out-File $logFile -Append
+                # Windows 11 native rounded corners (DWMWCP_ROUNDSMALL)
+                try {
+                    $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
+                    $pref = 3
+                    [Win32.DwmUtil]::DwmSetWindowAttribute($helper.Handle, 33, [ref]$pref, 4)
+                } catch {}
+                [System.Media.SystemSounds]::Asterisk.Play()
+                $enterSB.Begin()
+                "Entering dispatcher frame" | Out-File $logFile -Append
+                [System.Windows.Threading.Dispatcher]::PushFrame($frame)
+                "Exited dispatcher frame" | Out-File $logFile -Append
+                $window.Close()
+                "Window closed" | Out-File $logFile -Append
+            } catch {
+                "ERROR showing window: $_" | Out-File $logFile -Append
+            }
         }
     }
     Start-Sleep -Milliseconds 250

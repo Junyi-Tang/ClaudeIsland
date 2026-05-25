@@ -73,7 +73,7 @@ Add to your Claude Code settings (`~/.claude/settings.json` or project `.claude/
 
 ```powershell
 Start-Process powershell -WindowStyle Hidden -ArgumentList @(
-    "-NoProfile", "-ExecutionPolicy", "Bypass",
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA",
     "-File", """C:\Users\YOURNAME\path\to\ClaudeCodeNotifyBeacon\notify-daemon.ps1"""
 )
 ```
