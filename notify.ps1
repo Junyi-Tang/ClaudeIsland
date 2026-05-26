@@ -15,6 +15,12 @@ if (Test-Path $daemonLock) {
 if (-not $daemonAlive) {
     $daemonPath = Join-Path (Split-Path $MyInvocation.MyCommand.Path -Parent) "notify-daemon.ps1"
     Start-Process powershell -WindowStyle Hidden -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", $daemonPath)
+    # Wait for daemon to signal ready (up to 10s)
+    $readyFile = "$env:TEMP\claude_notify_ready.txt"
+    for ($i = 0; $i -lt 40; $i++) {
+        Start-Sleep -Milliseconds 250
+        if (Test-Path $readyFile) { break }
+    }
 }
 
 $lockFile = "$env:TEMP\claude_notify_lock.txt"
