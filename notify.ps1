@@ -31,10 +31,7 @@ if (Test-Path $lockFile) {
 }
 $now.ToString("o") | Out-File $lockFile -Force
 
-# Instant audio — plays before WPF even loads
-[System.Media.SystemSounds]::Asterisk.Play()
-
-# Try stdin for hook JSON (non-blocking — Peek returns -1 if no data)
+# Hook stdin parsing (non-blocking)
 if ([string]::IsNullOrEmpty($Message)) {
     try {
         if ([Console]::In.Peek() -ne -1) {

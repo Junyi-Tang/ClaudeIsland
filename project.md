@@ -14,8 +14,8 @@ Claude Code hook
 
 | File | Role |
 |---|---|
-| `notify.ps1` | Hook entry point. Checks daemon liveness via PID lock, auto-starts if dead, debounces (90s cooldown), plays `Asterisk` sound, reads stdin for hook JSON, writes trigger file. Polls ready-signal file after starting daemon to prevent startup race. |
-| `notify-daemon.ps1` | Long-running WPF daemon. Uses `FileSystemWatcher` with `WaitForChanged` to detect trigger file writes instantly with zero CPU polling. 100ms debounce suppresses duplicate FS events. Single-instance via PID lock file. Signals ready via `claude_notify_ready.txt`. |
+| `notify.ps1` | Hook entry point. Checks daemon liveness via PID lock, auto-starts if dead, debounces (90s cooldown), reads stdin for hook JSON, writes trigger file. Polls ready-signal file after starting daemon to prevent startup race. |
+| `notify-daemon.ps1` | Long-running WPF daemon. Uses `DispatcherTimer` (250ms interval) integrated with the WPF message pump to detect trigger files with near-zero latency. Plays `Asterisk` chime on notification. Single-instance via PID lock file. Signals ready via `claude_notify_ready.txt`. |
 | `assets/claudecode-color.svg` | Claude Code wordmark icon rendered in the notification badge. |
 
 ## Trigger protocol
@@ -42,9 +42,11 @@ Start-Process powershell -WindowStyle Hidden -ArgumentList @(
 
 ## Known issues
 
-- **Notification not appearing (2026-05-25):** After the FSW refactor, notifications stopped showing. The daemon process starts and signals ready, but the WPF window never renders. Suspects: WPF threading/Dispatcher issue on Windows 11, or `PushFrame` blocking on a non-UI thread. The polling-based version (commit `8d4d7a5`) was working reliably. The FSW-based version (commit `04b6bd2`) is broken — revert to polling if needed.
+- **Double sound (resolved):** Sound plays once in `notify-daemon.ps1` after `$window.Show()`. `notify.ps1` does not play sound, so no overlap.
 
-- **Double sound:** `notify.ps1` plays `Asterisk` before writing trigger. The daemon should NOT also play sound, or the two sounds overlap.
+## Changelog
+
+- **2026-05-25:** Replaced `FileSystemWatcher.WaitForChanged` (commit `04b6bd2`) with `DispatcherTimer`-based polling (250ms interval). `WaitForChanged` blocked the STA thread in a way that prevented WPF's dispatcher from properly pumping messages, so `PushFrame` inside `Show-Notification` never rendered the window. `DispatcherTimer` integrates directly with the WPF message pump — the timer ticks on the UI thread, and `PushFrame` in Show-Notification creates a proper nested message loop for animations.
 
 ## Design
 

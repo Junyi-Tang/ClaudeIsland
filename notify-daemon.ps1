@@ -58,21 +58,13 @@ if (Test-Path $daemonLock) {
 }
 $PID | Out-File -FilePath $daemonLock -Force
 
-# ── FileSystemWatcher — native FS events, instant with zero CPU ──
-$watcher = New-Object System.IO.FileSystemWatcher
-$watcher.Path = $env:TEMP
-$watcher.Filter = "claude_notify_trigger.txt"
-$watcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite -bor [System.IO.NotifyFilters]::FileName
-$watcher.IncludeSubdirectories = $false
-$changeTypes = [System.IO.WatcherChangeTypes]::Changed -bor [System.IO.WatcherChangeTypes]::Created
-
 # Signal that daemon is ready to receive events
 $readyFile = "$env:TEMP\claude_notify_ready.txt"
 "$PID" | Out-File -FilePath $readyFile -Force
 
-# Debounce state — prevent duplicate events and double-sound
-$script:lastEventTime = [DateTime]::MinValue
-$debounceMs = 100
+# Debounce state — prevent duplicate triggers
+$script:lastTriggerTime = [DateTime]::MinValue
+$script:isShowing = $false
 
 function Show-Notification {
     param([string]$Message)
@@ -286,37 +278,40 @@ function Show-Notification {
     })
 
     $window.Show()
+    [System.Media.SystemSounds]::Asterisk.Play()
     $enterSB.Begin()
     [System.Windows.Threading.Dispatcher]::PushFrame($frame)
     $window.Close()
 }
 
-# ── Main event loop ──
-while ($true) {
-    try {
-        $result = $watcher.WaitForChanged($changeTypes, 5000)
-        if ($result.TimedOut) { continue }
-    } catch {
-        Start-Sleep -Milliseconds 1000
-        continue
-    }
+# ── DispatcherTimer polling — integrates with WPF message pump, no blocking I/O ──
+$pollTimer = New-Object System.Windows.Threading.DispatcherTimer
+$pollTimer.Interval = [TimeSpan]::FromMilliseconds(250)
 
-    # Debounce — suppress duplicate FS events within 100ms
+$pollTimer.Add_Tick({
+    if ($script:isShowing) { return }
+    if (-not (Test-Path $triggerFile)) { return }
+
     $now = [DateTime]::Now
-    if (($now - $script:lastEventTime).TotalMilliseconds -lt $debounceMs) { continue }
-    $script:lastEventTime = $now
+    if (($now - $script:lastTriggerTime).TotalMilliseconds -lt 100) { return }
+    $script:lastTriggerTime = $now
 
-    # Let the write settle before reading
-    Start-Sleep -Milliseconds 50
+    Start-Sleep -Milliseconds 30
 
-    if (-not (Test-Path $triggerFile)) { continue }
     try {
         $Message = (Get-Content $triggerFile -Encoding utf8 -Raw).Trim()
         if (-not $Message) { $Message = "Task completed" }
-    } catch { continue }
+    } catch { return }
 
-    # Clear trigger file to prevent re-firing on next WatcherChanged cycle
     Remove-Item $triggerFile -Force -ErrorAction SilentlyContinue
 
+    $script:isShowing = $true
     Show-Notification -Message $Message
-}
+    $script:isShowing = $false
+})
+
+$pollTimer.Start()
+
+# Main dispatcher loop — pumps WPF messages indefinitely (never returns)
+$mainFrame = New-Object System.Windows.Threading.DispatcherFrame
+[System.Windows.Threading.Dispatcher]::PushFrame($mainFrame)
