@@ -47,8 +47,6 @@ $propOpacity = New-Object System.Windows.PropertyPath("Opacity")
 $propScaleX  = New-Object System.Windows.PropertyPath("ScaleX")
 $propScaleY  = New-Object System.Windows.PropertyPath("ScaleY")
 
-$lastTrigger = $null
-
 # Single-instance guard — write PID so notify.ps1 can detect us
 $daemonLock = "$env:TEMP\claude_notify_daemon.lock"
 if (Test-Path $daemonLock) {
@@ -60,15 +58,33 @@ if (Test-Path $daemonLock) {
 }
 $PID | Out-File -FilePath $daemonLock -Force
 
+# ── FileSystemWatcher — native FS events, instant with zero CPU ──
+$watcher = New-Object System.IO.FileSystemWatcher
+$watcher.Path = $env:TEMP
+$watcher.Filter = "claude_notify_trigger.txt"
+$watcher.NotifyFilter = [System.IO.NotifyFilters]::LastWrite -bor [System.IO.NotifyFilters]::FileName
+$watcher.IncludeSubdirectories = $false
+
+$script:lastEventTime = [DateTime]::MinValue
+$debounceMs = 100
+$changeTypes = [System.IO.WatcherChangeTypes]::Changed -bor [System.IO.WatcherChangeTypes]::Created
+
 while ($true) {
-    if (Test-Path $triggerFile) {
-        $current = (Get-Item $triggerFile).LastWriteTime
-        if ($current -ne $lastTrigger) {
-            $lastTrigger = $current
-            $Message = (Get-Content $triggerFile -Encoding utf8 -Raw).Trim()
-            if (-not $Message) { $Message = "Task completed" }
-            $showTime = Get-Date
-            $screen = [System.Windows.SystemParameters]::WorkArea
+    try { $result = $watcher.WaitForChanged($changeTypes) } catch { Start-Sleep -Milliseconds 1000; continue }
+
+    # Debounce — suppress duplicate FS events within 100ms
+    $now = [DateTime]::Now
+    if (($now - $script:lastEventTime).TotalMilliseconds -lt $debounceMs) { continue }
+    $script:lastEventTime = $now
+
+    # Let the write settle before reading
+    Start-Sleep -Milliseconds 50
+
+    if (-not (Test-Path $triggerFile)) { continue }
+    $Message = (Get-Content $triggerFile -Encoding utf8 -Raw).Trim()
+    if (-not $Message) { $Message = "Task completed" }
+    $showTime = Get-Date
+    $screen = [System.Windows.SystemParameters]::WorkArea
 
             # ── Window (Fully Stripped Chrome) ──
             $window = New-Object System.Windows.Window
@@ -283,11 +299,7 @@ while ($true) {
             })
 
             $window.Show()
-            [System.Media.SystemSounds]::Asterisk.Play()
             $enterSB.Begin()
             [System.Windows.Threading.Dispatcher]::PushFrame($frame)
             $window.Close()
-        }
-    }
-    Start-Sleep -Milliseconds 250
 }
