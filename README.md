@@ -63,6 +63,16 @@ Add to your Claude Code settings (`~/.claude/settings.json` or project `.claude/
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File \"C:\\Users\\YOURNAME\\path\\to\\ClaudeCodeNotifyBeacon\\notify.ps1\" -Message \"Session complete\""
+          }
+        ]
+      }
     ]
   },
   "preferredNotifChannel": "notifications_disabled"
@@ -92,14 +102,16 @@ The daemon stays running in the background. Start it once per login session.
 ┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
 │ Claude Code │ ──▶ │  notify.ps1   │ ──▶ │ notify-daemon.ps1│
 │ Notification│     │ sound + write │     │ WPF pill on      │
-│ hook fires  │     │ trigger file  │     │ screen 30s       │
+│ or Stop hook│     │ trigger file  │     │ screen 30s       │
 └─────────────┘     └──────────────┘     └──────────────────┘
                            ~10ms               ~250ms poll
 ```
 
-1. Claude Code finishes a task → `Notification` hook fires
-2. `notify.ps1` runs: debounce check → plays system chime → writes trigger file → exits
+1. Claude Code finishes a task → `Notification` hook fires (shows task summary); or the agentic loop ends → `Stop` hook fires (shows "Session complete")
+2. `notify.ps1` runs: debounce check → writes trigger file → exits
 3. `notify-daemon.ps1` (persistent background process with WPF pre-loaded) detects the trigger within 250ms → renders the Dynamic Island pill instantly
+
+The 90-second debounce means only one pill appears if both hooks fire for the same event.
 
 ## File Structure
 

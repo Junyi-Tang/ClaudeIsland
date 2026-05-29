@@ -9,11 +9,15 @@ if (Test-Path $daemonLock) {
     try {
         $daemonPid = [int](Get-Content $daemonLock -Raw).Trim()
         $daemonProc = Get-Process -Id $daemonPid -ErrorAction SilentlyContinue
-        if ($daemonProc -and $daemonProc.ProcessName -eq "powershell") { $daemonAlive = $true }
+        if ($daemonProc -and $daemonProc.ProcessName -eq "powershell") {
+            $cmdLine = (Get-CimInstance Win32_Process -Filter "ProcessId=$daemonPid" -ErrorAction SilentlyContinue).CommandLine
+            if ($cmdLine -like "*notify-daemon.ps1*") { $daemonAlive = $true }
+        }
     } catch {}
 }
 if (-not $daemonAlive) {
     $daemonPath = Join-Path (Split-Path $MyInvocation.MyCommand.Path -Parent) "notify-daemon.ps1"
+    Remove-Item "$env:TEMP\claude_notify_ready.txt" -Force -ErrorAction SilentlyContinue
     Start-Process powershell -WindowStyle Hidden -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File", $daemonPath)
     # Wait for daemon to signal ready (up to 10s)
     $readyFile = "$env:TEMP\claude_notify_ready.txt"
