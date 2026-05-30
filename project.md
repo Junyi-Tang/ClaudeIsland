@@ -6,7 +6,7 @@ WPF desktop notification daemon for Claude Code task completion events. Shows a 
 
 ```
 Claude Code hook
-  → notify.ps1          # Entry point: auto-starts daemon, plays sound, writes trigger
+  → notify.ps1          # Entry point: auto-starts daemon, writes trigger
     → notify-daemon.ps1 # Persistent daemon: watches trigger file, shows WPF notification
 ```
 
@@ -14,8 +14,8 @@ Claude Code hook
 
 | File | Role |
 |---|---|
-| `notify.ps1` | Hook entry point. Checks daemon liveness via PID lock, auto-starts if dead, debounces (90s cooldown), reads stdin for hook JSON, writes trigger via atomic `WriteAllText`. Polls ready-signal file after starting daemon to prevent startup race. |
-| `notify-daemon.ps1` | Long-running WPF daemon. Uses `DispatcherTimer` at 50ms (imperceptible latency, well below the ~100ms human perception threshold). Single-instance via PID lock. Signals ready via `claude_notify_ready.txt`. Plays `Asterisk` chime on notification. |
+| `notify.ps1` | Hook entry point. Checks daemon liveness via PID lock (verifies CommandLine contains `notify-daemon.ps1` to prevent PID-collision false positives), auto-starts if dead, debounces (90s cooldown), reads stdin for hook JSON, writes trigger via atomic `WriteAllText`. Polls ready-signal file after starting daemon to prevent startup race. |
+| `notify-daemon.ps1` | Long-running WPF daemon. Uses `DispatcherTimer` at 50ms (imperceptible latency, well below the ~100ms human perception threshold). Single-instance via PID lock (same CommandLine guard). Signals ready via `claude_notify_ready.txt`. Plays `Asterisk` chime on notification. |
 | `assets/claudecode-color.svg` | Claude Code wordmark icon rendered in the notification badge. |
 
 ## Trigger protocol
@@ -26,7 +26,7 @@ All files live in `$env:TEMP`:
 |---|---|
 | `claude_notify_trigger.txt` | Message payload. Daemon reads and displays content, then deletes it. |
 | `claude_notify_daemon.lock` | Contains daemon PID. Used for single-instance guard and liveness check. |
-| `claude_notify_ready.txt` | Written by daemon once the FSW and dispatcher are primed. `notify.ps1` polls this before writing trigger. |
+| `claude_notify_ready.txt` | Written by daemon once the DispatcherTimer is primed. `notify.ps1` polls this before writing trigger. Deleted by `notify.ps1` before each daemon launch to prevent stale-file false positives. |
 | `claude_notify_lock.txt` | Debounce timestamp. `notify.ps1` skips if last trigger was < 90s ago. |
 
 ## Daemon startup
@@ -42,7 +42,7 @@ Start-Process powershell -WindowStyle Hidden -ArgumentList @(
 
 ## Known issues
 
-- **Double sound (resolved):** Sound plays once in `notify-daemon.ps1` after `$window.Show()`. `notify.ps1` does not play sound, so no overlap.
+- **Double sound (resolved):** Sound plays once in `notify-daemon.ps1` after `$window.Show()`. `notify.ps1` never plays sound.
 
 ## Changelog
 

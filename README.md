@@ -6,11 +6,11 @@ A premium Dynamic Island-style desktop notification pill for [Claude Code](https
 
 ## Features
 
-- **Dynamic Island pill** — 400×90 custom WPF floating window, CornerRadius 16, drop shadow
+- **Dynamic Island pill** — 400×92 custom WPF floating window, CornerRadius 26, drop shadow
 - **Zero-latency daemon** — WPF assemblies pre-loaded in a persistent background process; pill appears within 250ms of task completion
 - **Official Claude SVG icon** — SVG-parsed brand logo with correct EvenOdd fill-rule via `GeometryDrawing`
 - **Windows 11 native rounded corners** — DWM API (`DWMWCP_ROUNDSMALL`) for true rounded window edges
-- **GPU-accelerated Storyboards** — entrance (250ms scale+fade), auto-dismiss (350ms fade after 30s), click dismiss (150ms fade)
+- **GPU-accelerated Storyboards** — entrance (300ms scale+fade), auto-dismiss (250ms fade after 8s), click dismiss (120ms fade)
 - **Dynamic task context** — reads hook stdin JSON to show real task summaries in the pill body
 - **Debounce** — 90s lock file prevents duplicate notifications
 
@@ -25,7 +25,7 @@ Most Claude Code notification projects for Windows use `[Windows.UI.Notification
 | **Icon** | Official Claude SVG (EvenOdd fill) | N/A or raster fallback |
 | **Rounded corners** | DWM native (Win32 level) | System-determined |
 | **Latency** | ~250ms (pre-warmed daemon) | Varies (PowerShell cold start) |
-| **Dismiss** | Click 150ms fade + 30s auto-fade | System-managed |
+| **Dismiss** | Click 120ms fade + 8s auto-fade | System-managed |
 | **GPU accelerated** | Yes (WPF Storyboard) | No |
 | **Architecture** | Daemon + trigger file | Direct PowerShell call |
 
@@ -101,8 +101,8 @@ The daemon stays running in the background. Start it once per login session.
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
 │ Claude Code │ ──▶ │  notify.ps1   │ ──▶ │ notify-daemon.ps1│
-│ Notification│     │ sound + write │     │ WPF pill on      │
-│ or Stop hook│     │ trigger file  │     │ screen 30s       │
+│ Notification│     │ write trigger │     │ WPF pill on      │
+│ or Stop hook│     │ file + exit   │     │ screen ~8s       │
 └─────────────┘     └──────────────┘     └──────────────────┘
                            ~10ms               ~250ms poll
 ```
