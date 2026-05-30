@@ -53,7 +53,10 @@ if (Test-Path $daemonLock) {
     try {
         $existingPid = [int](Get-Content $daemonLock -Raw).Trim()
         $existingProc = Get-Process -Id $existingPid -ErrorAction SilentlyContinue
-        if ($existingProc -and $existingProc.ProcessName -eq "powershell") { exit 0 }
+        if ($existingProc -and $existingProc.ProcessName -eq "powershell") {
+            $existingCmd = (Get-CimInstance Win32_Process -Filter "ProcessId=$existingPid" -ErrorAction SilentlyContinue).CommandLine
+            if ($existingCmd -like "*notify-daemon.ps1*") { exit 0 }
+        }
     } catch {}
 }
 $PID | Out-File -FilePath $daemonLock -Force

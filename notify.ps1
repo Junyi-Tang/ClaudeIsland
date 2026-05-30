@@ -30,10 +30,12 @@ if (-not $daemonAlive) {
 $lockFile = "$env:TEMP\claude_notify_lock.txt"
 $now = Get-Date
 if (Test-Path $lockFile) {
-    $last = Get-Date (Get-Content $lockFile)
-    if (($now - $last).TotalSeconds -lt 90) { exit 0 }
+    try {
+        $last = Get-Date (Get-Content $lockFile -Raw).Trim()
+        if (($now - $last).TotalSeconds -lt 90) { exit 0 }
+    } catch {}
 }
-$now.ToString("o") | Out-File $lockFile -Force
+[System.IO.File]::WriteAllText($lockFile, $now.ToString("o"), [System.Text.Encoding]::UTF8)
 
 # Hook stdin parsing (non-blocking)
 if ([string]::IsNullOrEmpty($Message)) {
