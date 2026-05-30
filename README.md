@@ -46,7 +46,24 @@ git clone https://github.com/Junyi-Tang/ClaudeCodeNotifyBeacon.git
 # or just download notify.ps1, notify-daemon.ps1, and assets/
 ```
 
-### 2. Configure the hook
+### 2. Install (recommended)
+
+Run the installer from the project folder. It registers the hooks in your
+`~/.claude/settings.json` (backing up any existing file first, never duplicating
+entries) and starts the daemon:
+
+```powershell
+.\install.ps1
+```
+
+Restart any open Claude Code session afterward so it reloads `settings.json`.
+
+> **Note:** the installer registers a **`Stop`** hook (fires every time Claude
+> finishes a turn — this is the reliable trigger) and a **`Notification`** hook
+> (fires when Claude Code emits its own notification). The `Stop` hook works
+> regardless of your `preferredNotifChannel` setting.
+
+### Or configure manually
 
 Add to your Claude Code settings (`~/.claude/settings.json` or project `.claude/settings.json`):
 
@@ -74,12 +91,18 @@ Add to your Claude Code settings (`~/.claude/settings.json` or project `.claude/
         ]
       }
     ]
-  },
-  "preferredNotifChannel": "notifications_disabled"
+  }
 }
 ```
 
-### 3. Start the daemon
+> **About `preferredNotifChannel`:** setting it to `"notifications_disabled"`
+> stops Claude Code from sending its *own* OS notification, which avoids a
+> double-notify alongside the pill — but it can also suppress the
+> **`Notification`** hook. The **`Stop`** hook fires either way, so leave this
+> setting at its default unless you specifically want to silence Claude's
+> native notifications and rely on the `Stop` hook alone.
+
+### 3. Start the daemon (manual install only)
 
 ```powershell
 Start-Process powershell -WindowStyle Hidden -ArgumentList @(
@@ -117,6 +140,7 @@ The 90-second debounce means only one pill appears if both hooks fire for the sa
 
 ```
 ClaudeCodeNotifyBeacon/
+├── install.ps1              # One-command installer (registers hooks + starts daemon)
 ├── notify.ps1               # Hook entry point (trigger writer)
 ├── notify-daemon.ps1        # Persistent notification daemon (WPF)
 ├── assets/

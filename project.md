@@ -14,6 +14,7 @@ Claude Code hook
 
 | File | Role |
 |---|---|
+| `install.ps1` | One-command installer. Merges `Stop` + `Notification` hooks into `~/.claude/settings.json` (backs up first, idempotent — skips entries already pointing at this `notify.ps1`), then starts the daemon. Run once after cloning. |
 | `notify.ps1` | Hook entry point. Checks daemon liveness via PID lock (verifies CommandLine contains `notify-daemon.ps1` to prevent PID-collision false positives), auto-starts if dead, debounces (90s cooldown), reads stdin for hook JSON, writes trigger via atomic `WriteAllText`. Polls ready-signal file after starting daemon to prevent startup race. |
 | `notify-daemon.ps1` | Long-running WPF daemon. Uses `DispatcherTimer` at 50ms (imperceptible latency, well below the ~100ms human perception threshold). Single-instance via PID lock (same CommandLine guard). Signals ready via `claude_notify_ready.txt`. Plays `Asterisk` chime on notification. |
 | `assets/claudecode-color.svg` | Claude Code wordmark icon rendered in the notification badge. |
